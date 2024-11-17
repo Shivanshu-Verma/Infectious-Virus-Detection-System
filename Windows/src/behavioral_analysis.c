@@ -5,7 +5,7 @@
 #include <detours.h>  // Include Microsoft Detours header
 #include "behavioral_analysis.h"
 
-// Original function pointers
+/ Original function pointers
 static HANDLE(WINAPI *OriginalCreateFileW)(
     LPCWSTR lpFileName,
     DWORD dwDesiredAccess,
@@ -14,6 +14,14 @@ static HANDLE(WINAPI *OriginalCreateFileW)(
     DWORD dwCreationDisposition,
     DWORD dwFlagsAndAttributes,
     HANDLE hTemplateFile) = CreateFileW;
+
+static LONG(WINAPI *OriginalRegSetValueExW)(
+    HKEY hKey,
+    LPCWSTR lpValueName,
+    DWORD Reserved,
+    DWORD dwType,
+    const BYTE *lpData,
+    DWORD cbData) = RegSetValueExW;
 
 // Hooked function for CreateFileW
 HANDLE WINAPI HookedCreateFileW(
@@ -33,19 +41,35 @@ HANDLE WINAPI HookedCreateFileW(
                                dwFlagsAndAttributes, hTemplateFile);
 }
 
+// Hooked function for RegSetValueExW
+LONG WINAPI HookedRegSetValueExW(
+    HKEY hKey,
+    LPCWSTR lpValueName,
+    DWORD Reserved,
+    DWORD dwType,
+    const BYTE *lpData,
+    DWORD cbData) {
+    // Log the registry modification
+    wprintf(L"[HOOK] RegSetValueExW called. Key: %p, ValueName: %ls\n", hKey, lpValueName);
+
+    // Call the original RegSetValueExW function
+    return OriginalRegSetValueExW(hKey, lpValueName, Reserved, dwType, lpData, cbData);
+}
+
 // Monitor system calls
 void monitor_system_calls() {
     log_event("Starting system call monitoring...");
 
-    // Attach the hook for CreateFileW
+    // Attach hooks for CreateFileW and RegSetValueExW
     DetourTransactionBegin();
     DetourUpdateThread(GetCurrentThread());
     DetourAttach(&(PVOID &)OriginalCreateFileW, HookedCreateFileW);
+    DetourAttach(&(PVOID &)OriginalRegSetValueExW, HookedRegSetValueExW);
 
     if (DetourTransactionCommit() == NO_ERROR) {
-        log_event("Successfully hooked CreateFileW.");
+        log_event("Successfully hooked CreateFileW and RegSetValueExW.");
     } else {
-        log_event("Failed to hook CreateFileW.");
+        log_event("Failed to hook CreateFileW or RegSetValueExW.");
         return;
     }
 
@@ -56,13 +80,19 @@ void monitor_system_calls() {
         Sleep(1000);
     }
 
-    // Detach the hook (not reached unless the program terminates cleanly)
+    // Detach the hooks (not reached unless the program terminates cleanly)
     DetourTransactionBegin();
     DetourUpdateThread(GetCurrentThread());
     DetourDetach(&(PVOID &)OriginalCreateFileW, HookedCreateFileW);
+    DetourDetach(&(PVOID &)OriginalRegSetValueExW, HookedRegSetValueExW);
     DetourTransactionCommit();
 
     log_event("System call monitoring stopped.");
+}
+
+// Utility function to log events
+void log_event(const char *message) {
+    printf("[EVENT]: %s\n", message);
 }
 
 // Utility function to log events
