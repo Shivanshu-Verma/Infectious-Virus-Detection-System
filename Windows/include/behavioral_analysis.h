@@ -14,4 +14,7 @@ void monitor_registry_changes();
 void monitor_system_calls();
 void log_event(const char *message);
 
+// Global variable for log file
+extern FILE *log_file;
+
 #endif

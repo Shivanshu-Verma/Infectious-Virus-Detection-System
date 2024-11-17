@@ -5,7 +5,24 @@
 #include <detours.h>  // Include Microsoft Detours header
 #include "behavioral_analysis.h"
 
-/ Original function pointers
+
+// Global variable for the log file
+FILE *log_file = NULL;
+
+// Utility function to log events
+void log_event(const char *message) {
+    printf("[EVENT]: %s\n", message);  // Display on the terminal
+
+    // Write to the log file
+    if (log_file) {
+        fprintf(log_file, "[EVENT]: %s\n", message);
+        fflush(log_file);  // Ensure the log is written immediately
+    }
+}
+
+
+
+// Original function pointers
 static HANDLE(WINAPI *OriginalCreateFileW)(
     LPCWSTR lpFileName,
     DWORD dwDesiredAccess,
@@ -90,10 +107,7 @@ void monitor_system_calls() {
     log_event("System call monitoring stopped.");
 }
 
-// Utility function to log events
-void log_event(const char *message) {
-    printf("[EVENT]: %s\n", message);
-}
+
 
 // Utility function to log events
 void log_event(const char *message) {
@@ -141,6 +155,11 @@ void monitor_folder(const char *folder_path) {
                 WCHAR fileName[MAX_PATH_LENGTH];
                 wcsncpy(fileName, info->FileName, info->FileNameLength / sizeof(WCHAR));
                 fileName[info->FileNameLength / sizeof(WCHAR)] = L'\0';
+
+                wchar_t log_message[512];
+                swprintf(log_message, 512, L"[MONITOR] File changed: %ls\n", fileName);
+                wprintf(log_message);  // Display on the terminal
+                if (log_file) fwprintf(log_file, log_message);  // Write to the log file
 
                 wprintf(L"[MONITOR] File changed: %ls\n", fileName);
                 info = info->NextEntryOffset ? (FILE_NOTIFY_INFORMATION *)((BYTE *)info + info->NextEntryOffset) : NULL;
@@ -210,8 +229,15 @@ void monitor_registry_changes() {
 
 // Start behavioral analysis
 void start_behavior_analysis(const char *folder_path) {
+    log_file = fopen("behavior_analysis.log", "a");  // Open the log file in append mode
+    if (!log_file) {
+        printf("[ERROR]: Failed to open log file for writing.\n");
+        return;
+    }
+
     log_event("Starting Behavioral Analysis...");
     monitor_folder(folder_path);
     monitor_registry_changes();
     monitor_system_calls();
+    fclose(log_file);  // Close the log file
 }
