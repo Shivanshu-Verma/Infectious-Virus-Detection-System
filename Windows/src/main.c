@@ -1,6 +1,7 @@
 #include <stdio.h>
+#include <string.h>
 #include "virus_signature.h"
-#include <stdlib.h>
+#include "behavioral_analysis.h"
 
 int main(int argc, char *argv[]) {
     if (argc != 3) {
@@ -15,7 +16,16 @@ int main(int argc, char *argv[]) {
     load_virus_signatures(&db, csv_file);
 
     if (check_file_signature(file_to_scan, &db)) {
-        printf("Threat detected in %s!\n", file_to_scan);
+        printf("Virus detected in %s!\n", file_to_scan);
+
+        // Extract folder path from the file path
+        char folder_path[MAX_PATH_LENGTH];
+        strncpy(folder_path, file_to_scan, MAX_PATH_LENGTH);
+        char *last_slash = strrchr(folder_path, '\\');
+        if (last_slash) *last_slash = '\0';  // Trim to folder path
+
+        // Start behavioral analysis on the folder
+        start_behavior_analysis(folder_path);
     } else {
         printf("No threats detected in %s.\n", file_to_scan);
     }
