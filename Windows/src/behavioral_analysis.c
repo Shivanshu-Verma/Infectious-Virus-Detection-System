@@ -109,43 +109,43 @@ LONG WINAPI HookedRegSetValueExW(
 }
 
 // Monitor system calls
-void monitor_system_calls()
-{
-    log_event("Starting system call monitoring...");
+// void monitor_system_calls()
+// {
+//     log_event("Starting system call monitoring...");
 
-    // Attach hooks for CreateFileW and RegSetValueExW
-    DetourTransactionBegin();
-    DetourUpdateThread(GetCurrentThread());
-    DetourAttach((PVOID *)&OriginalCreateFileW, HookedCreateFileW);
-    DetourAttach((PVOID *)&OriginalRegSetValueExW, HookedRegSetValueExW);
+//     // Attach hooks for CreateFileW and RegSetValueExW
+//     DetourTransactionBegin();
+//     DetourUpdateThread(GetCurrentThread());
+//     DetourAttach((PVOID *)&OriginalCreateFileW, HookedCreateFileW);
+//     DetourAttach((PVOID *)&OriginalRegSetValueExW, HookedRegSetValueExW);
 
-    if (DetourTransactionCommit() == NO_ERROR)
-    {
-        log_event("Successfully hooked CreateFileW and RegSetValueExW.");
-    }
-    else
-    {
-        log_event("Failed to hook CreateFileW or RegSetValueExW.");
-        return;
-    }
+//     if (DetourTransactionCommit() == NO_ERROR)
+//     {
+//         log_event("Successfully hooked CreateFileW and RegSetValueExW.");
+//     }
+//     else
+//     {
+//         log_event("Failed to hook CreateFileW or RegSetValueExW.");
+//         return;
+//     }
 
-    log_event("System call monitoring active. Press Ctrl+C to stop.");
+//     log_event("System call monitoring active. Press Ctrl+C to stop.");
 
-    // Wait indefinitely to keep the hooks active
-    while (1)
-    {
-        Sleep(1000);
-    }
+//     // Wait indefinitely to keep the hooks active
+//     while (1)
+//     {
+//         Sleep(1000);
+//     }
 
-    // Detach the hooks (not reached unless the program terminates cleanly)
-    DetourTransactionBegin();
-    DetourUpdateThread(GetCurrentThread());
-    DetourDetach((PVOID *)&OriginalCreateFileW, HookedCreateFileW);
-    DetourDetach((PVOID *)&OriginalRegSetValueExW, HookedRegSetValueExW);
-    DetourTransactionCommit();
+//     // Detach the hooks (not reached unless the program terminates cleanly)
+//     DetourTransactionBegin();
+//     DetourUpdateThread(GetCurrentThread());
+//     DetourDetach((PVOID *)&OriginalCreateFileW, HookedCreateFileW);
+//     DetourDetach((PVOID *)&OriginalRegSetValueExW, HookedRegSetValueExW);
+//     DetourTransactionCommit();
 
-    log_event("System call monitoring stopped.");
-}
+//     log_event("System call monitoring stopped.");
+// }
 
 // Monitor folder for changes
 void monitor_folder(const char *folder_path)
@@ -226,10 +226,10 @@ void monitor_registry_changes()
     HKEY hKey;
     HANDLE hEvent;
 
-    // Open the key to monitor (e.g., Startup entries)
+    // Open the registry key to monitor
     if (RegOpenKeyEx(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Run", 0, KEY_NOTIFY, &hKey) != ERROR_SUCCESS)
     {
-        log_event("Failed to open registry key.");
+        log_event("[ERROR] Failed to open registry key. Check permissions.");
         return;
     }
 
@@ -237,21 +237,23 @@ void monitor_registry_changes()
     hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
     if (!hEvent)
     {
-        log_event("Failed to create event object.");
+        log_event("[ERROR] Failed to create event object.");
         RegCloseKey(hKey);
         return;
     }
 
     // Set up registry notification
-    if (RegNotifyChangeKeyValue(hKey, TRUE, REG_NOTIFY_CHANGE_NAME | REG_NOTIFY_CHANGE_LAST_SET, hEvent, TRUE) != ERROR_SUCCESS)
+    if (RegNotifyChangeKeyValue(hKey, TRUE,
+                                REG_NOTIFY_CHANGE_NAME | REG_NOTIFY_CHANGE_LAST_SET | REG_NOTIFY_CHANGE_ATTRIBUTES,
+                                hEvent, TRUE) != ERROR_SUCCESS)
     {
-        log_event("Failed to set registry notification.");
+        log_event("[ERROR] Failed to set registry notification.");
         CloseHandle(hEvent);
         RegCloseKey(hKey);
         return;
     }
 
-    log_event("Registry monitoring active...");
+    log_event("Registry monitoring active. Waiting for changes...");
 
     // Monitor registry changes indefinitely
     while (1)
@@ -259,19 +261,25 @@ void monitor_registry_changes()
         DWORD result = WaitForSingleObject(hEvent, INFINITE);
         if (result == WAIT_OBJECT_0)
         {
-            log_event("[ALERT] Registry change detected in monitored key!");
+            log_event("[ALERT] Registry change detected!");
 
             // Re-arm the registry notification
-            if (RegNotifyChangeKeyValue(hKey, TRUE, REG_NOTIFY_CHANGE_NAME | REG_NOTIFY_CHANGE_LAST_SET, hEvent, TRUE) != ERROR_SUCCESS)
+            if (RegNotifyChangeKeyValue(hKey, TRUE,
+                                        REG_NOTIFY_CHANGE_NAME | REG_NOTIFY_CHANGE_LAST_SET | REG_NOTIFY_CHANGE_ATTRIBUTES,
+                                        hEvent, TRUE) != ERROR_SUCCESS)
             {
-                log_event("Failed to re-arm registry notification.");
+                log_event("[ERROR] Failed to re-arm registry notification. Exiting...");
                 break;
             }
         }
-        else
+        else if (result == WAIT_FAILED)
         {
-            log_event("Error or termination detected in registry monitoring.");
+            log_event("[ERROR] WaitForSingleObject failed. Exiting...");
             break;
+        }
+        else if (result == WAIT_TIMEOUT)
+        {
+            log_event("[INFO] Registry monitoring timed out. Re-checking...");
         }
     }
 
@@ -280,11 +288,49 @@ void monitor_registry_changes()
     log_event("Registry monitoring stopped.");
 }
 
+// Thread function prototypes
+DWORD WINAPI ThreadMonitorRegistry(LPVOID lpParam);
+DWORD WINAPI ThreadMonitorFolder(LPVOID lpParam);
+
+// Thread function for registry monitoring
+DWORD WINAPI ThreadMonitorRegistry(LPVOID lpParam)
+{
+    monitor_registry_changes();
+    return 0;
+}
+
+// Thread function for folder monitoring
+DWORD WINAPI ThreadMonitorFolder(LPVOID lpParam)
+{
+    const char *folder_path = (const char *)lpParam;
+    monitor_folder(folder_path);
+    return 0;
+}
+
 // Start behavioral analysis
+// void start_behavior_analysis(const char *folder_path, const char *virus_file)
+// {
+//     strncpy(monitored_file, virus_file, MAX_PATH_LENGTH);
+//     strncpy(monitored_folder, folder_path, MAX_PATH_LENGTH);
+
+//     log_file = fopen("behavior_analysis.log", "a"); // Open the log file in append mode
+//     if (!log_file)
+//     {
+//         printf("[ERROR]: Failed to open log file for writing.\n");
+//         return;
+//     }
+
+//     log_event("Starting Behavioral Analysis...");
+//     monitor_registry_changes();
+//     monitor_folder(folder_path);
+//     // monitor_system_calls();
+//     fclose(log_file); // Close the log file
+// }
+
 void start_behavior_analysis(const char *folder_path, const char *virus_file)
 {
-    strncpy(monitored_file, virus_file, MAX_PATH_LENGTH);
-    strncpy(monitored_folder, folder_path, MAX_PATH_LENGTH);
+    strncpy_s(monitored_file, sizeof(monitored_file), virus_file, MAX_PATH_LENGTH);
+    strncpy_s(monitored_folder, sizeof(monitored_folder), folder_path, MAX_PATH_LENGTH);
 
     log_file = fopen("behavior_analysis.log", "a"); // Open the log file in append mode
     if (!log_file)
@@ -294,7 +340,27 @@ void start_behavior_analysis(const char *folder_path, const char *virus_file)
     }
 
     log_event("Starting Behavioral Analysis...");
-    monitor_folder(folder_path);
-    monitor_system_calls();
+
+    // Create threads for monitoring registry and folder
+    HANDLE hThreadRegistry = CreateThread(
+        NULL, 0, ThreadMonitorRegistry, NULL, 0, NULL);
+    if (hThreadRegistry == NULL)
+    {
+        log_event("[ERROR] Failed to create registry monitoring thread.");
+        return;
+    }
+
+    HANDLE hThreadFolder = CreateThread(
+        NULL, 0, ThreadMonitorFolder, (LPVOID)folder_path, 0, NULL);
+    if (hThreadFolder == NULL)
+    {
+        log_event("[ERROR] Failed to create folder monitoring thread.");
+        return;
+    }
+
+    // Wait for both threads to finish (if desired)
+    WaitForMultipleObjects(2, (HANDLE[]){hThreadRegistry, hThreadFolder}, TRUE, INFINITE);
+
     fclose(log_file); // Close the log file
+    log_event("Behavioral Analysis completed.");
 }
