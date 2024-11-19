@@ -2,8 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <windows.h>
-#include "../detours/include/detours.h"
-#include <winreg.h> //Include Microsoft Detours header
+#include "../detours/include/detours.h" // Include Microsoft Detours header
+#include <winreg.h>                     //Include Microsoft Detours header
 #include "../include/behavioral_analysis.h"
 
 // Global variables
