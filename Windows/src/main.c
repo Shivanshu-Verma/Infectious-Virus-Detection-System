@@ -3,6 +3,8 @@
 #include "../include/virus_signature.h"
 #include "../include/behavioral_analysis.h"
 #include "virus_signature.c"
+#include "alert_box.c"
+#include "../include/alert_box.h"
 #include "behavioral_analysis.c"
 
 int main(int argc, char *argv[])
@@ -40,6 +42,11 @@ int main(int argc, char *argv[])
             memmove(virus_name, last_slash_virus + 1, strlen(last_slash_virus));
         }
         printf("Virus name: %s\n", virus_name);
+
+        // Generate alert box
+        char alert_message[256];
+        snprintf(alert_message, sizeof(alert_message), "Virus detected: %s\nFolder: %s\n", virus_name, folder_path);
+        show_alert(alert_message);
 
         // Start behavioral analysis with the virus name
         start_behavior_analysis(folder_path, virus_name);
