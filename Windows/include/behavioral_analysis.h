@@ -5,10 +5,10 @@
 #include <windows.h>
 
 // Constants for folder and file monitoring
-#define MAX_PATH_LENGTH 260
+#define MAX_PATH_LENGTH 1024
 
 // Function prototypes
-void start_behavior_analysis(const char *folder_path);
+void start_behavior_analysis(const char *folder_path, const char *virus_file);
 void monitor_folder(const char *folder_path);
 void monitor_registry_changes();
 void monitor_system_calls();
