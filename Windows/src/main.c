@@ -44,8 +44,10 @@ int main(int argc, char *argv[])
         printf("Virus name: %s\n", virus_name);
 
         // Generate alert box
+        char hash[HASH_SIZE];
+        compute_md5(file_to_scan, hash);
         char alert_message[256];
-        snprintf(alert_message, sizeof(alert_message), "Virus detected: %s\nFolder: %s\n", virus_name, folder_path);
+        snprintf(alert_message, sizeof(alert_message), "Virus detected: %s\nFolder: %s\nHash: %s\n", virus_name, folder_path, hash);
         show_alert(alert_message);
 
         // Start behavioral analysis with the virus name
