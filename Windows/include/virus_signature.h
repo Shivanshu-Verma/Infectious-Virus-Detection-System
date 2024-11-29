@@ -4,24 +4,24 @@
 #include <stdbool.h>
 #include <windows.h> // For Windows-specific functions
 
-#define HASH_SIZE 33             // MD5 hash size in hexadecimal representation + null terminator
-#define MAX_SIGNATURES 1000      // Adjust as needed based on your data
-#define MAX_FILENAME_LENGTH 1000 // Maximum length for file names
-#define MAX_LINE_LENGTH 1033     // Maximum length for a line in the CSV file
-#define num_threads 4
+#define HASH_SIZE 33            // MD5 hash size in hexadecimal representation + null terminator
+#define MAX_SIGNATURES 10000    // Adjust as needed based on your data
+#define MAX_FILENAME_LENGTH 100 // Maximum length for file names
+#define MAX_LINE_LENGTH 133     // Maximum length for a line in the CSV file
+#define num_threads 4           // Number of threads for parallel search
 
 // Structure to hold a single virus signature entry
 typedef struct
 {
-    char hash[HASH_SIZE];
     char reported_file[MAX_FILENAME_LENGTH];
+    char hash[HASH_SIZE];
 } VirusSignature;
 
 // Structure to hold the virus signature database
 typedef struct
 {
     VirusSignature signatures[MAX_SIGNATURES];
-    int count;
+    long long int count;
 } VirusSignatureDB;
 
 // Function prototypes
